@@ -11,6 +11,8 @@ duckdb = "^0.10.0"
 pydantic = "^2.6.4"
 pytest = "^8.1.1"
 ruff = "^0.3.3"
+requests = "^2.31.0"
+loguru = "^0.7.2"
 
 
 [build-system]
