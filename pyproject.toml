@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "magic-the-gathering-pipeline"
+version = "0.1.0"
+description = ""
+authors = ["Pitta <arthurpitta21@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+duckdb = "^0.10.0"
+pydantic = "^2.6.4"
+pytest = "^8.1.1"
+ruff = "^0.3.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
