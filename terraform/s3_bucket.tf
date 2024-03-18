@@ -4,12 +4,13 @@ resource "aws_s3_bucket" "bucket" {
   bucket = "magic-the-gathering-bucket"
 }
 
-resource "aws_s3_bucket_versioning" "bucket_versioning" {
-  bucket = aws_s3_bucket.bucket.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
+## Consumes more space 
+# resource "aws_s3_bucket_versioning" "bucket_versioning" {
+#   bucket = aws_s3_bucket.bucket.id
+#   versioning_configuration {
+#     status = "Enabled"
+#   }
+# }
 
 resource "aws_s3_bucket_lifecycle_configuration" "bucket_lifecycle_configuration" {
   bucket = aws_s3_bucket.bucket.id
