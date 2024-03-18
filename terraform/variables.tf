@@ -10,6 +10,6 @@ variable "AWS_SECRET_KEY" {
 }
 
 variable "AWS_REGION" {
-    description = "AWD Region."
+    description = "AWS Region."
     type = string
 }
