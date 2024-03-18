@@ -1,11 +1,13 @@
 from datetime import datetime
+import json
 import os
 import requests
-import json
-from loguru import logger
-import duckdb
+
 import boto3
+
 from dotenv import load_dotenv
+
+from loguru import logger
 
 
 class Ingestor:
@@ -47,7 +49,7 @@ class Ingestor:
             # Parse the update timestamp to extract the date
             update_date = datetime.strptime(update_timestamp, "%Y-%m-%dT%H:%M:%S.%f%z").date()
             
-            logger.info("Data extracted successfully. Update timestamp: {}", update_date)
+            logger.info("Data extracted successfully. Update date: {}", update_date)
             return data, update_date
         
         except KeyError as e:
