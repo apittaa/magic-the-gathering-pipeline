@@ -1,16 +1,24 @@
 from datetime import datetime
+import os
 import requests
 import json
 from loguru import logger
 import duckdb
+import boto3
+from dotenv import load_dotenv
 
 
 class Ingestor:
     
-    def __init__(self, url, dataset, table_name):
+    def __init__(self, url, dataset, table_name, table_path, bucket_name, aws_access_key, aws_secret_access_key):
         self.url = url
         self.dataset = dataset
         self.table_name = table_name
+        self.table_path = table_path
+        self.bucket_name = bucket_name
+        self.s3_client = boto3.client('s3',
+                                      aws_access_key_id=aws_access_key,
+                                      aws_secret_access_key=aws_secret_access_key)
         # Configure Loguru to log messages to both the console and a file
         logger.add("app.log", rotation="1 day")  # Log file will rotate daily
         
@@ -52,12 +60,16 @@ class Ingestor:
     
     def save_data_local(self, data):
         try:
+            # Create folder if it does not exist
+            if not os.path.exists(os.path.dirname(self.table_path)):
+                os.makedirs(os.path.dirname(self.table_path))
+            
             # Fetch JSON data from the download URI
             data_response = requests.get(data)
             data_response.raise_for_status()  # Raise an exception for HTTP errors
             
             # Save the JSON data to a local file
-            path = f"data/{self.table_name}.json"
+            path = f"{self.table_path}{self.table_name}.json"
             json.dump(data_response.json(), open(path, 'w'), indent=4)
             logger.info("Data saved locally to {}", path)
             
@@ -69,6 +81,26 @@ class Ingestor:
         
         except Exception as e:
             logger.error("An unexpected error occurred: {}", e)
+            
+    def save_data_s3(self, data):
+        try:
+            # Fetch JSON data from the download URI
+            response = requests.get(data)
+            response.raise_for_status()  # Raise exception for HTTP errors
+
+            # Convert response JSON to bytes
+            json_bytes = json.dumps(response.json(), indent=4).encode('utf-8')
+
+            # Upload JSON data to S3
+            self.s3_client.put_object(Body=json_bytes, Bucket=self.bucket_name, Key=f"{self.table_path}{self.table_name}.json")
+
+            logger.info("Data saved successfully to S3 bucket: {}", self.bucket_name)
+        except requests.exceptions.RequestException as e:
+            logger.error("Failed to fetch data from URL: {}", data)
+            logger.error("Error: {}", e)
+        except Exception as e:
+            logger.error("An error occurred while saving data to S3 bucket:")
+            logger.error(e)
         
     def execute(self):
         # Fetch data object from the API
@@ -81,6 +113,8 @@ class Ingestor:
             if data is not None:
                 # Save data locally
                 self.save_data_local(data)
+                # Save data s3
+                self.save_data_s3(data)
             else:
                 logger.error("Failed to fetch data.")
         
@@ -88,9 +122,16 @@ class Ingestor:
             logger.error("Failed to fetch data object.")
 
 
+load_dotenv()
+
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME")
+
 url = "https://api.scryfall.com/bulk-data/"
 dataset = "default_cards"  # one entry in db per printed card / "oracle_cards" one entry in db per card, multiple printings of the same card are unified
 table_name = "cards"
+table_path = "data/raw/"
 
-ingest = Ingestor(url, dataset, table_name)
+ingest = Ingestor(url, dataset, table_name, table_path, AWS_BUCKET_NAME, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
 ingest.execute()
