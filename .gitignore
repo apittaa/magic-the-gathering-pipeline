@@ -161,3 +161,9 @@ cython_debug/
 
 # Data Folder
 data/
+
+# Terraform environment variables
+terraform/.terraform*
+terraform/terraform.tfvars
+terraform/terraform.tfstate
+terraform/*.backup
