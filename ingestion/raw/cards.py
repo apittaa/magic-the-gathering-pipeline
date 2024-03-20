@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from loguru import logger
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
 from models.card import Card
 
 
