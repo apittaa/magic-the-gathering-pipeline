@@ -8,7 +8,6 @@ class AllParts(BaseModel):
     name: str
     type_line: str
     uri: str
-    
+
     def __getitem__(self, item):
         return getattr(self, item)
-    

@@ -8,7 +8,6 @@ class ImageUris(BaseModel):
     png: str
     art_crop: str
     border_crop: str
-    
+
     def __getitem__(self, item):
         return getattr(self, item)
-    

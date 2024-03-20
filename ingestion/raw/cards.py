@@ -8,7 +8,7 @@ import boto3
 from dotenv import load_dotenv
 from loguru import logger
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from models.card import Card
 
@@ -58,8 +58,10 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to fetch data: {e}")
             return None
-        
-    def fetch_cards_data(self, response: requests.Response) -> Optional[requests.Response]:
+
+    def fetch_cards_data(
+        self, response: requests.Response
+    ) -> Optional[requests.Response]:
         """
         Fetchs data from the bulk data download uri
 
@@ -76,8 +78,12 @@ class APIClient:
             data = requests.get(download_uri)
             update_timestamp = response.json()["updated_at"]
             # Parse the update timestamp to extract the date
-            update_date = datetime.strptime(update_timestamp, "%Y-%m-%dT%H:%M:%S.%f%z").date()
-            logger.success(f"Data fetched successfully from {download_uri} - Update date: {update_date}")
+            update_date = datetime.strptime(
+                update_timestamp, "%Y-%m-%dT%H:%M:%S.%f%z"
+            ).date()
+            logger.success(
+                f"Data fetched successfully from {download_uri} - Update date: {update_date}"
+            )
             return data
         except KeyError as e:
             logger.error(f"Failed to extract data from API response: {e}")
@@ -85,7 +91,7 @@ class APIClient:
         except ValueError as e:
             logger.error(f"Failed to parse timestamp: {e}")
             return None
-            
+
 
 class DataParser:
     """
@@ -118,14 +124,23 @@ class DataSaver:
     """
     Class for saving data.
     """
-    
-    def __init__(self, table_path: str, table_name: str, bucket_name: Optional[str], access_key_id: Optional[str], secret_access_key: Optional[str]):
+
+    def __init__(
+        self,
+        table_path: str,
+        table_name: str,
+        bucket_name: Optional[str],
+        access_key_id: Optional[str],
+        secret_access_key: Optional[str],
+    ):
         self.table_path = table_path
         self.table_name = table_name
         self.bucket_name = bucket_name
         if bucket_name:
             self.s3_client = boto3.client(
-                's3',                                      aws_access_key_id=access_key_id,                                     aws_secret_access_key=secret_access_key
+                "s3",
+                aws_access_key_id=access_key_id,
+                aws_secret_access_key=secret_access_key,
             )
 
     def save_local(self, data: List[Dict[str, Any]]) -> None:
@@ -144,7 +159,7 @@ class DataSaver:
             logger.info("Saving data locally")
             path = os.path.join(self.table_path, f"{self.table_name}.json")
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, 'w') as file:
+            with open(path, "w") as file:
                 json.dump([item.dict() for item in data], file, indent=4)
             logger.success(f"Data saved locally to {path}")
         except Exception as e:
@@ -166,14 +181,16 @@ class DataSaver:
         """
         try:
             logger.info("Saving data to S3 bucket")
-            json_bytes = json.dumps([item.dict() for item in data], indent=4).encode('utf-8')
+            json_bytes = json.dumps([item.dict() for item in data], indent=4).encode(
+                "utf-8"
+            )
             key = f"{self.table_path}{self.table_name}.json"
             self.s3_client.put_object(Body=json_bytes, Bucket=self.bucket_name, Key=key)
             logger.success(f"Data saved successfully to S3 bucket: {self.bucket_name}")
         except Exception as e:
             logger.error(f"An error occurred while saving data to S3 bucket: {e}")
-            
-            
+
+
 class Ingestor:
     """
     Class for ingesting data from an API, parsing it, and saving it.
@@ -194,7 +211,7 @@ class Ingestor:
         # Fetch data from the API
         bulk_data = self.api_client.fetch_bulk_data()
         cards_data = self.api_client.fetch_cards_data(bulk_data)
-        
+
         if cards_data:
             # Parse data
             parsed_data = self.data_parser.parse_cards(cards_data)
@@ -208,7 +225,9 @@ class Ingestor:
 # Create instances of classes
 api_client = APIClient(API_BASE_URL, DATASET_NAME)
 data_parser = DataParser()
-data_saver = DataSaver(TABLE_PATH, TABLE_NAME, AWS_BUCKET_NAME, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
+data_saver = DataSaver(
+    TABLE_PATH, TABLE_NAME, AWS_BUCKET_NAME, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY
+)
 
 # Create an instance of Ingestor and execute the ingestion process
 ingestor = Ingestor(api_client, data_parser, data_saver)

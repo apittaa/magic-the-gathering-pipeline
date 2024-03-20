@@ -167,3 +167,6 @@ terraform/.terraform*
 terraform/terraform.tfvars
 terraform/terraform.tfstate
 terraform/*.backup
+
+# Ruff
+.ruff_cache

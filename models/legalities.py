@@ -24,7 +24,6 @@ class Legalities(BaseModel):
     oldschool: str
     premodern: str
     predh: str
-    
+
     def __getitem__(self, item):
         return getattr(self, item)
-    

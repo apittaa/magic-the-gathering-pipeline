@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import date
 
 from models.image_uris import ImageUris
 from models.all_parts import AllParts
@@ -13,7 +12,7 @@ from models.purchase_uris import PurchaseUris
 class Card(BaseModel):
     object: str
     id: str
-    oracle_id: Optional[str] = ''
+    oracle_id: Optional[str] = ""
     multiverse_ids: Optional[List] = None
     mtgo_id: Optional[int] = 0
     mtgo_foil_id: Optional[int] = 0
@@ -28,12 +27,12 @@ class Card(BaseModel):
     highres_image: bool
     image_status: str
     image_uris: Optional[ImageUris] = None
-    mana_cost: Optional[str] = ''
+    mana_cost: Optional[str] = ""
     cmc: Optional[float] = 0.0
-    type_line: Optional[str] = ''
-    oracle_text: Optional[str] = ''
-    power: Optional[str] = ''
-    toughness: Optional[str] = ''
+    type_line: Optional[str] = ""
+    oracle_text: Optional[str] = ""
+    power: Optional[str] = ""
+    toughness: Optional[str] = ""
     colors: Optional[List[str]] = None
     color_identity: List[str]
     keywords: List[str]
@@ -60,11 +59,11 @@ class Card(BaseModel):
     collector_number: str
     digital: bool
     rarity: str
-    flavor_text: Optional[str] = ''
-    card_back_id: Optional[str] = ''
-    artist: Optional[str] = ''
+    flavor_text: Optional[str] = ""
+    card_back_id: Optional[str] = ""
+    artist: Optional[str] = ""
     artist_ids: Optional[List[str]] = None
-    illustration_id: Optional[str] = ''
+    illustration_id: Optional[str] = ""
     border_color: str
     frame: str
     full_art: bool
@@ -79,4 +78,3 @@ class Card(BaseModel):
 
     def __getitem__(self, item):
         return getattr(self, item)
-    
