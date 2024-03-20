@@ -1,139 +1,214 @@
 from datetime import datetime
 import json
 import os
+import sys
+from typing import Any, Dict, List, Optional
 import requests
-
 import boto3
-
 from dotenv import load_dotenv
-
 from loguru import logger
 
-
-class Ingestor:
-    
-    def __init__(self, url, dataset, table_name, table_path, bucket_name, aws_access_key, aws_secret_access_key):
-        self.url = url
-        self.dataset = dataset
-        self.table_name = table_name
-        self.table_path = table_path
-        self.bucket_name = bucket_name
-        self.s3_client = boto3.client('s3',
-                                      aws_access_key_id=aws_access_key,
-                                      aws_secret_access_key=aws_secret_access_key)
-        # Configure Loguru to log messages to both the console and a file
-        logger.add("app.log", rotation="1 day")  # Log file will rotate daily
-        
-    def get_data_object(self):
-        try:
-            # Construct the URL for fetching data
-            url = f"{self.url}/{self.dataset}"
-            
-            # Send HTTP GET request to fetch data
-            response = requests.get(url, timeout=5)
-            response.raise_for_status()  # Raise an exception for HTTP errors
-            
-            logger.info("Data object fetched successfully from {}", url)
-            return response
-        
-        except requests.exceptions.RequestException as e:
-            logger.error("Failed to fetch data object: {}", e)
-            return None
-    
-    def get_data(self, response):
-        try:
-            # Extract relevant data and update timestamp from the API response
-            data = response.json()["download_uri"]
-            update_timestamp = response.json()["updated_at"]
-            
-            # Parse the update timestamp to extract the date
-            update_date = datetime.strptime(update_timestamp, "%Y-%m-%dT%H:%M:%S.%f%z").date()
-            
-            logger.info("Data extracted successfully. Update date: {}", update_date)
-            return data, update_date
-        
-        except KeyError as e:
-            logger.error("Failed to extract data from API response: {}", e)
-            return None, None
-        
-        except ValueError as e:
-            logger.error("Failed to parse timestamp: {}", e)
-            return None, None
-    
-    def save_data_local(self, data):
-        try:
-            # Create folder if it does not exist
-            if not os.path.exists(os.path.dirname(self.table_path)):
-                os.makedirs(os.path.dirname(self.table_path))
-            
-            # Fetch JSON data from the download URI
-            data_response = requests.get(data)
-            data_response.raise_for_status()  # Raise an exception for HTTP errors
-            
-            # Save the JSON data to a local file
-            path = f"{self.table_path}{self.table_name}.json"
-            json.dump(data_response.json(), open(path, 'w'), indent=4)
-            logger.info("Data saved locally to {}", path)
-            
-        except requests.exceptions.RequestException as e:
-            logger.error("Failed to download JSON data: {}", e)
-        
-        except json.JSONDecodeError as e:
-            logger.error("Failed to decode JSON data: {}", e)
-        
-        except Exception as e:
-            logger.error("An unexpected error occurred: {}", e)
-            
-    def save_data_s3(self, data):
-        try:
-            # Fetch JSON data from the download URI
-            response = requests.get(data)
-            response.raise_for_status()  # Raise exception for HTTP errors
-
-            # Convert response JSON to bytes
-            json_bytes = json.dumps(response.json(), indent=4).encode('utf-8')
-
-            # Upload JSON data to S3
-            self.s3_client.put_object(Body=json_bytes, Bucket=self.bucket_name, Key=f"{self.table_path}{self.table_name}.json")
-
-            logger.info("Data saved successfully to S3 bucket: {}", self.bucket_name)
-        except requests.exceptions.RequestException as e:
-            logger.error("Failed to fetch data from URL: {}", data)
-            logger.error("Error: {}", e)
-        except Exception as e:
-            logger.error("An error occurred while saving data to S3 bucket:")
-            logger.error(e)
-        
-    def execute(self):
-        # Fetch data object from the API
-        response = self.get_data_object()
-        
-        if response is not None:
-            # Extract data and update date from the response
-            data, update_date = self.get_data(response)
-            
-            if data is not None:
-                # Save data locally
-                self.save_data_local(data)
-                # Save data s3
-                self.save_data_s3(data)
-            else:
-                logger.error("Failed to fetch data.")
-        
-        else:
-            logger.error("Failed to fetch data object.")
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from models.card import Card
 
 
+# Load environment variables
 load_dotenv()
 
+# Configuration
+API_BASE_URL = "https://api.scryfall.com/bulk-data/"
+DATASET_NAME = "default_cards"
+TABLE_NAME = "cards"
+TABLE_PATH = "data/raw/"
+AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME")
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME")
 
-url = "https://api.scryfall.com/bulk-data/"
-dataset = "default_cards"  # one entry in db per printed card / "oracle_cards" one entry in db per card, multiple printings of the same card are unified
-table_name = "cards"
-table_path = "data/raw/"
 
-ingest = Ingestor(url, dataset, table_name, table_path, AWS_BUCKET_NAME, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
-ingest.execute()
+class APIClient:
+    """
+    Class for interacting with an API.
+    """
+
+    def __init__(self, base_url: str, dataset: str) -> None:
+        self.base_url = base_url
+        self.dataset = dataset
+
+    def fetch_bulk_data(self) -> Optional[requests.Response]:
+        """
+        Fetches data from the API.
+
+        Args:
+            dataset (str): Name of the dataset to fetch.
+
+        Returns:
+            dict: Response JSON data.
+        """
+        try:
+            logger.info("Fetching bulk data")
+            # Construct the URL for fetching data
+            url = f"{self.base_url}{self.dataset}"
+            # Send HTTP GET request to fetch data
+            response = requests.get(url, timeout=5)
+            # Raise an exception for HTTP errors
+            response.raise_for_status()
+            logger.success(f"Data fetched successfully from {url}")
+            return response
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch data: {e}")
+            return None
+        
+    def fetch_cards_data(self, response: requests.Response) -> Optional[requests.Response]:
+        """
+        Fetchs data from the bulk data download uri
+
+        Args:
+            response (Response): Response object from the API.
+
+        Returns:
+            dict: Response JSON data.
+        """
+        try:
+            logger.info("Fetching cards data")
+            # Extract relevant data and update timestamp from the API response
+            download_uri = response.json()["download_uri"]
+            data = requests.get(download_uri)
+            update_timestamp = response.json()["updated_at"]
+            # Parse the update timestamp to extract the date
+            update_date = datetime.strptime(update_timestamp, "%Y-%m-%dT%H:%M:%S.%f%z").date()
+            logger.success(f"Data fetched successfully from {download_uri} - Update date: {update_date}")
+            return data
+        except KeyError as e:
+            logger.error(f"Failed to extract data from API response: {e}")
+            return None
+        except ValueError as e:
+            logger.error(f"Failed to parse timestamp: {e}")
+            return None
+            
+
+class DataParser:
+    """
+    Class for parsing data.
+    """
+
+    @staticmethod
+    def parse_cards(data: requests.Response) -> Optional[List[Card]]:
+        """
+        Parses JSON data into instances of the Card model.
+
+        Args:
+            data (dict): JSON data to parse.
+
+        Returns:
+            List[Card]: List of parsed Card instances.
+        """
+        try:
+            logger.info("Parsing data")
+            cards_data = data.json()
+            parsed_cards = [Card(**card) for card in cards_data]
+            logger.success("Data parsing successful!")
+            return parsed_cards
+        except Exception as e:
+            logger.error(f"An unexpected error occurred: {e}")
+            return None
+
+
+class DataSaver:
+    """
+    Class for saving data.
+    """
+    
+    def __init__(self, table_path: str, table_name: str, bucket_name: Optional[str], access_key_id: Optional[str], secret_access_key: Optional[str]):
+        self.table_path = table_path
+        self.table_name = table_name
+        self.bucket_name = bucket_name
+        if bucket_name:
+            self.s3_client = boto3.client(
+                's3',                                      aws_access_key_id=access_key_id,                                     aws_secret_access_key=secret_access_key
+            )
+
+    def save_local(self, data: List[Dict[str, Any]]) -> None:
+        """
+        Saves parsed data to a local file.
+
+        Args:
+            data (list): List of parsed data.
+            table_path (str): Path to store local data.
+            table_name (str): Name of the table.
+
+        Returns:
+            None
+        """
+        try:
+            logger.info("Saving data locally")
+            path = os.path.join(self.table_path, f"{self.table_name}.json")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w') as file:
+                json.dump([item.dict() for item in data], file, indent=4)
+            logger.success(f"Data saved locally to {path}")
+        except Exception as e:
+            logger.error(f"An error occurred while saving data locally: {e}")
+
+    def save_s3(self, data: List[Dict[str, Any]]) -> None:
+        """
+        Saves parsed data to AWS S3 bucket.
+
+        Args:
+            data (list): List of parsed data.
+            s3_client: Boto3 S3 client.
+            bucket_name (str): Name of the AWS S3 bucket.
+            table_path (str): Path to store data in S3.
+            table_name (str): Name of the table.
+
+        Returns:
+            None
+        """
+        try:
+            logger.info("Saving data to S3 bucket")
+            json_bytes = json.dumps([item.dict() for item in data], indent=4).encode('utf-8')
+            key = f"{self.table_path}{self.table_name}.json"
+            self.s3_client.put_object(Body=json_bytes, Bucket=self.bucket_name, Key=key)
+            logger.success(f"Data saved successfully to S3 bucket: {self.bucket_name}")
+        except Exception as e:
+            logger.error(f"An error occurred while saving data to S3 bucket: {e}")
+            
+            
+class Ingestor:
+    """
+    Class for ingesting data from an API, parsing it, and saving it.
+    """
+
+    def __init__(self, api_client, data_parser, data_saver):
+        self.api_client = api_client
+        self.data_parser = data_parser
+        self.data_saver = data_saver
+
+    def execute(self) -> None:
+        """
+        Executes the ingestion process.
+
+        Args:
+            dataset (str): Name of the dataset to fetch.
+        """
+        # Fetch data from the API
+        bulk_data = self.api_client.fetch_bulk_data()
+        cards_data = self.api_client.fetch_cards_data(bulk_data)
+        
+        if cards_data:
+            # Parse data
+            parsed_data = self.data_parser.parse_cards(cards_data)
+            if parsed_data:
+                # Save data locally
+                self.data_saver.save_local(parsed_data)
+                # Save data to S3
+                self.data_saver.save_s3(parsed_data)
+
+
+# Create instances of classes
+api_client = APIClient(API_BASE_URL, DATASET_NAME)
+data_parser = DataParser()
+data_saver = DataSaver(TABLE_PATH, TABLE_NAME, AWS_BUCKET_NAME, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
+
+# Create an instance of Ingestor and execute the ingestion process
+ingestor = Ingestor(api_client, data_parser, data_saver)
+ingestor.execute()
