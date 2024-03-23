@@ -24,6 +24,7 @@ class DuckDBManager:
     """
     Manages DuckDB connection and executes queries.
     """
+
     def __init__(self):
         """
         Initializes DuckDBManager.
@@ -45,7 +46,7 @@ class DuckDBManager:
         except Exception as e:
             logger.error(f"Error creating DuckDB connection: {e}")
             return None
-        
+
     def execute_query(self, query: str) -> None:
         """
         Executes a SQL query.
@@ -57,7 +58,7 @@ class DuckDBManager:
             None
         """
         try:
-            logger.info(f"Executing query: {query}")
+            logger.info(f"Executing query")
             self.connection.execute(query)
             logger.success("Query executed")
         except Exception as e:
@@ -68,6 +69,7 @@ class MotherDuckManager:
     """
     Manages connection to MotherDuck.
     """
+
     def __init__(self, duckdb_manager: DuckDBManager, motherduck_token: str):
         """
         Initializes MotherDuckManager.
@@ -93,18 +95,27 @@ class MotherDuckManager:
             logger.info("Connecting to Mother Duck")
             self.duckdb_manager.execute_query("INSTALL md;")
             self.duckdb_manager.execute_query("LOAD md;")
-            self.duckdb_manager.execute_query(f"SET motherduck_token='{motherduck_token}'")
+            self.duckdb_manager.execute_query(
+                f"SET motherduck_token='{motherduck_token}'"
+            )
             self.duckdb_manager.execute_query("ATTACH 'md:'")
             logger.success("Connected to Mother Duck!")
         except Exception as e:
             logger.error(f"Error connecting to MotherDuck: {e}")
-            
-            
+
+
 class AWSManager:
     """
     Manages AWS credentials and operations.
     """
-    def __init__(self, duckdb_manager: DuckDBManager, aws_region: str, aws_access_key: str, aws_secret_access_key: str):
+
+    def __init__(
+        self,
+        duckdb_manager: DuckDBManager,
+        aws_region: str,
+        aws_access_key: str,
+        aws_secret_access_key: str,
+    ):
         """
         Initializes AWSManager.
 
@@ -116,8 +127,10 @@ class AWSManager:
         """
         self.duckdb_manager = duckdb_manager
         self.load_credentials(aws_region, aws_access_key, aws_secret_access_key)
-        
-    def load_credentials(self, aws_region: str, aws_access_key: str, aws_secret_access_key: str) -> None:
+
+    def load_credentials(
+        self, aws_region: str, aws_access_key: str, aws_secret_access_key: str
+    ) -> None:
         """
         Loads AWS credentials.
 
@@ -134,19 +147,34 @@ class AWSManager:
             self.duckdb_manager.execute_query("INSTALL httpfs;")
             self.duckdb_manager.execute_query("LOAD httpfs;")
             self.duckdb_manager.execute_query(f"SET s3_region='{aws_region}'")
-            self.duckdb_manager.execute_query(f"SET s3_access_key_id='{aws_access_key}';")
-            self.duckdb_manager.execute_query(f"SET s3_secret_access_key='{aws_secret_access_key}';")
+            self.duckdb_manager.execute_query(
+                f"SET s3_access_key_id='{aws_access_key}';"
+            )
+            self.duckdb_manager.execute_query(
+                f"SET s3_secret_access_key='{aws_secret_access_key}';"
+            )
             self.duckdb_manager.execute_query("CALL load_aws_credentials();")
             logger.success("AWS credentials loaded!")
         except Exception as e:
             logger.error(f"Error loading AWS credentials: {e}")
-            
-            
+
+
 class DataManager:
     """
     Manages data operations.
     """
-    def __init__(self, duckdb_manager: DuckDBManager, local_database: str, remote_database: str, bronze_schema: str, table_name: str, local_path: str, raw_s3_path: str, bronze_s3_path: str):
+
+    def __init__(
+        self,
+        duckdb_manager: DuckDBManager,
+        local_database: str,
+        remote_database: str,
+        bronze_schema: str,
+        table_name: str,
+        local_path: str,
+        raw_s3_path: str,
+        bronze_s3_path: str,
+    ):
         """
         Initializes DataManager.
 
@@ -171,7 +199,7 @@ class DataManager:
         """
         try:
             logger.info("Creating cards table locally")
-            self.duckdb_manager.execute_query(f"""
+            query = f"""
                 CREATE OR REPLACE TABLE {self.local_database}.{self.table_name} AS
                 WITH ranked_cards AS (
                     SELECT
@@ -183,7 +211,8 @@ class DataManager:
                     * EXCLUDE (row_num)
                 FROM ranked_cards
                 WHERE row_num = 1;
-                """)
+                """
+            self.duckdb_manager.execute_query(query)
             logger.success("Cards table created!")
         except Exception as e:
             logger.error(f"Error creating table from JSON file: {e}")
@@ -198,7 +227,7 @@ class DataManager:
         try:
             logger.info("Saving cards table as parquet format locally")
             os.makedirs(os.path.dirname(self.local_path), exist_ok=True)
-            self.duckdb_manager.execute_query(f"""
+            query = f"""
                 COPY (
                     SELECT
                         *
@@ -206,7 +235,8 @@ class DataManager:
                 )
                 TO '{self.local_path}{self.table_name}.parquet'
                 (FORMAT PARQUET)
-                """)
+                """
+            self.duckdb_manager.execute_query(query)
             logger.success("Cards table saved locally!")
         except Exception as e:
             logger.error(f"Error saving to local: {e}")
@@ -220,7 +250,7 @@ class DataManager:
         """
         try:
             logger.info("Saving cards table to s3 as parquet")
-            self.duckdb_manager.execute_query(f"""
+            query = f"""
                 COPY (
                     SELECT
                         *
@@ -228,7 +258,8 @@ class DataManager:
                 )
                 TO '{self.bronze_s3_path}{self.table_name}.parquet'
                 (FORMAT PARQUET)
-                """)
+                """
+            self.duckdb_manager.execute_query(query)
             logger.success("Cards table saved to s3!")
         except Exception as e:
             logger.error(f"Error saving to S3: {e}")
@@ -242,26 +273,38 @@ class DataManager:
         """
         try:
             logger.info("Saving cards table to Mother Duck")
-            self.duckdb_manager.execute_query(f"CREATE DATABASE IF NOT EXISTS {self.remote_database}")
-            self.duckdb_manager.execute_query(f"CREATE SCHEMA IF NOT EXISTS {self.remote_database}.{self.bronze_schema}")
-            self.duckdb_manager.execute_query(f"""
+            self.duckdb_manager.execute_query(
+                f"CREATE DATABASE IF NOT EXISTS {self.remote_database}"
+            )
+            self.duckdb_manager.execute_query(
+                f"CREATE SCHEMA IF NOT EXISTS {self.remote_database}.{self.bronze_schema};"
+            )
+            query = f"""
                 CREATE OR REPLACE TABLE {self.remote_database}.{self.bronze_schema}.{self.table_name} AS
                     SELECT
                         *
-                    FROM {self.local_database}.{self.table_name}
-                """)
+                    FROM {self.local_database}.{self.table_name};
+                """
+            self.duckdb_manager.execute_query(query)
             logger.info("Cards table saved!")
         except Exception as e:
             logger.error(f"Error saving to MotherDuck: {e}")
-            
+
 
 class Ingestor:
     """
     Orchestrates the entire data ingestion process.
     """
-    def __init__(self, duckdb_manager, motherduck_manager, aws_manager, data_manager):
+
+    def __init__(
+        self,
+        duckdb_manager: DuckDBManager,
+        motherduck_manager: MotherDuckManager,
+        aws_manager: AWSManager,
+        data_manager: DataManager,
+    ):
         """
-        Initializes DataIngestor.
+        Initializes Ingestor.
         """
         self.duckdb_manager = duckdb_manager
         self.motherduck_manager = motherduck_manager
@@ -275,20 +318,35 @@ class Ingestor:
         Returns:
             None
         """
-        self.data_manager.create_table_from_json_file()
-        self.data_manager.save_to_local()
-        self.data_manager.save_to_s3()
-        self.data_manager.save_to_md()
+        try:
+            logger.info("Starting ingestion")
+            self.data_manager.create_table_from_json_file()
+            self.data_manager.save_to_local()
+            self.data_manager.save_to_s3()
+            self.data_manager.save_to_md()
+            logger.success("Ingestion completed!")
+        except Exception as e:
+            logger.error(f"Error executing data ingestion process: {e}")
 
 
 if __name__ == "__main__":
     # Create instances of classed
     duckdb_manager = DuckDBManager()
     motherduck_manager = MotherDuckManager(duckdb_manager, MOTHERDUCK_TOKEN)
-    aws_manager = AWSManager(duckdb_manager, AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
-    data_manager = DataManager(duckdb_manager, LOCAL_DATABASE, REMOTE_DATABASE, BRONZE_SCHEMA, TABLE_NAME, LOCAL_PATH, RAW_S3_PATH, BRONZE_S3_PATH)
-    
+    aws_manager = AWSManager(
+        duckdb_manager, AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY
+    )
+    data_manager = DataManager(
+        duckdb_manager,
+        LOCAL_DATABASE,
+        REMOTE_DATABASE,
+        BRONZE_SCHEMA,
+        TABLE_NAME,
+        LOCAL_PATH,
+        RAW_S3_PATH,
+        BRONZE_S3_PATH,
+    )
+
     # Creating an instance of DataIngestor and execute the ingestion process
     ingestor = Ingestor(duckdb_manager, motherduck_manager, aws_manager, data_manager)
     ingestor.execute()
-                
