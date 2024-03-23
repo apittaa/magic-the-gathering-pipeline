@@ -222,13 +222,14 @@ class Ingestor:
                 self.data_saver.save_s3(parsed_data)
 
 
-# Create instances of classes
-api_client = APIClient(API_BASE_URL, DATASET_NAME)
-data_parser = DataParser()
-data_saver = DataSaver(
-    TABLE_PATH, TABLE_NAME, AWS_BUCKET_NAME, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY
-)
+if __name__ == "__main__":
+    # Create instances of classes
+    api_client = APIClient(API_BASE_URL, DATASET_NAME)
+    data_parser = DataParser()
+    data_saver = DataSaver(
+        TABLE_PATH, TABLE_NAME, AWS_BUCKET_NAME, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY
+    )
 
-# Create an instance of Ingestor and execute the ingestion process
-ingestor = Ingestor(api_client, data_parser, data_saver)
-ingestor.execute()
+    # Create an instance of Ingestor and execute the ingestion process
+    ingestor = Ingestor(api_client, data_parser, data_saver)
+    ingestor.execute()

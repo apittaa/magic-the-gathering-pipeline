@@ -170,3 +170,6 @@ terraform/*.backup
 
 # Ruff
 .ruff_cache
+
+# Database
+*.db*
