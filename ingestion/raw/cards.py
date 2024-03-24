@@ -209,17 +209,22 @@ class Ingestor:
             dataset (str): Name of the dataset to fetch.
         """
         # Fetch data from the API
-        bulk_data = self.api_client.fetch_bulk_data()
-        cards_data = self.api_client.fetch_cards_data(bulk_data)
+        try:
+            logger.info("Starting ingestion")
+            bulk_data = self.api_client.fetch_bulk_data()
+            cards_data = self.api_client.fetch_cards_data(bulk_data)
 
-        if cards_data:
-            # Parse data
-            parsed_data = self.data_parser.parse_cards(cards_data)
-            if parsed_data:
-                # Save data locally
-                self.data_saver.save_local(parsed_data)
-                # Save data to S3
-                self.data_saver.save_s3(parsed_data)
+            if cards_data:
+                # Parse data
+                parsed_data = self.data_parser.parse_cards(cards_data)
+                if parsed_data:
+                    # Save data locally
+                    self.data_saver.save_local(parsed_data)
+                    # Save data to S3
+                    self.data_saver.save_s3(parsed_data)
+                    logger.success("Ingestion completed!")
+        except Exception as e:
+            logger.error(logger.error(f"Error executing data ingestion process: {e}"))
 
 
 if __name__ == "__main__":
