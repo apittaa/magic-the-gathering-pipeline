@@ -198,7 +198,9 @@ class Ingestor:
 if __name__ == "__main__":
     # Create instances of classed
     duckdb_manager = duckdb_manager.DuckDBManager()
-    motherduck_manager = motherduck_manager.MotherDuckManager(duckdb_manager, MOTHERDUCK_TOKEN)
+    motherduck_manager = motherduck_manager.MotherDuckManager(
+        duckdb_manager, MOTHERDUCK_TOKEN
+    )
     aws_manager = aws_manager.AWSManager(
         duckdb_manager, AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY
     )
