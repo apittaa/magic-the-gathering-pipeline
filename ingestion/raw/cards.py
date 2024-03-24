@@ -143,7 +143,7 @@ class DataSaver:
                 aws_secret_access_key=secret_access_key,
             )
 
-    def save_local(self, data: List[Dict[str, Any]]) -> None:
+    def save_local(self, data: List) -> None:
         """
         Saves parsed data to a local file.
 
