@@ -1,13 +1,8 @@
 import duckdb
 import os
-import sys
 from dotenv import load_dotenv
 from loguru import logger
 from typing import Any
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-
-from lib import duckdb_manager, motherduck_manager, aws_manager
 
 load_dotenv()
 
@@ -16,13 +11,154 @@ MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN")
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
-RAW_S3_PATH = os.getenv("RAW_S3_PATH")
 BRONZE_S3_PATH = os.getenv("BRONZE_S3_PATH")
-LOCAL_PATH = "data/bronze/"
+SILVER_S3_PATH = os.getenv("SILVER_S3_PATH")
+LOCAL_PATH = "data/silver/"
 TABLE_NAME = "cards"
-BRONZE_SCHEMA = "bronze"
+SILVER_SCHEMA = "silver"
 LOCAL_DATABASE = "memory"
 REMOTE_DATABASE = "magic_the_gathering"
+
+
+# Can import or transform into a utils
+class DuckDBManager:
+    """
+    Manages DuckDB connection and executes queries.
+    """
+
+    def __init__(self):
+        """
+        Initializes DuckDBManager.
+        """
+        self.connection = self.create_connection()
+
+    def create_connection(self) -> Any:
+        """
+        Create a connection to DuckDB.
+
+        Returns:
+            duckdb.Connection: DuckDB connection object.
+        """
+        try:
+            logger.info("Creating DuckDB connection")
+            duckdb_conn = duckdb.connect()
+            logger.success("DuckDB connection created!")
+            return duckdb_conn
+        except Exception as e:
+            logger.error(f"Error creating DuckDB connection: {e}")
+            return None
+
+    def execute_query(self, query: str) -> None:
+        """
+        Executes a SQL query.
+
+        Args:
+            query (str): SQL query to execute.
+
+        Returns:
+            None
+        """
+        try:
+            logger.info("Executing query")
+            self.connection.execute(query)
+            logger.success("Query executed")
+        except Exception as e:
+            logger.error(f"Error executing query: {e}")
+
+
+#Can import or transform as utils
+class MotherDuckManager:
+    """
+    Manages connection to MotherDuck.
+    """
+
+    def __init__(self, duckdb_manager: DuckDBManager, motherduck_token: str):
+        """
+        Initializes MotherDuckManager.
+
+        Args:
+            duckdb_manager (DuckDBManager): Instance of DuckDBManager.
+            motherduck_token (str): Token for accessing MotherDuck.
+        """
+        self.duckdb_manager = duckdb_manager
+        self.connect(motherduck_token)
+
+    def connect(self, motherduck_token: str) -> None:
+        """
+        Connects to MotherDuck.
+
+        Args:
+            motherduck_token (str): Token for accessing MotherDuck.
+
+        Returns:
+            None
+        """
+        try:
+            logger.info("Connecting to Mother Duck")
+            self.duckdb_manager.execute_query("INSTALL md;")
+            self.duckdb_manager.execute_query("LOAD md;")
+            self.duckdb_manager.execute_query(
+                f"SET motherduck_token='{motherduck_token}'"
+            )
+            self.duckdb_manager.execute_query("ATTACH 'md:'")
+            logger.success("Connected to Mother Duck!")
+        except Exception as e:
+            logger.error(f"Error connecting to MotherDuck: {e}")
+
+
+class AWSManager:
+    """
+    Manages AWS credentials and operations.
+    """
+
+    def __init__(
+        self,
+        duckdb_manager: DuckDBManager,
+        aws_region: str,
+        aws_access_key: str,
+        aws_secret_access_key: str,
+    ):
+        """
+        Initializes AWSManager.
+
+        Args:
+            duckdb_manager (DuckDBManager): Instance of DuckDBManager.
+            aws_region (str): AWS region.
+            aws_access_key (str): AWS access key ID.
+            aws_secret_access_key (str): AWS secret access key.
+        """
+        self.duckdb_manager = duckdb_manager
+        self.load_credentials(aws_region, aws_access_key, aws_secret_access_key)
+
+    def load_credentials(
+        self, aws_region: str, aws_access_key: str, aws_secret_access_key: str
+    ) -> None:
+        """
+        Loads AWS credentials.
+
+        Args:
+            aws_region (str): AWS region.
+            aws_access_key (str): AWS access key ID.
+            aws_secret_access_key (str): AWS secret access key.
+
+        Returns:
+            None
+        """
+        try:
+            logger.info("Loading AWS credentials")
+            self.duckdb_manager.execute_query("INSTALL httpfs;")
+            self.duckdb_manager.execute_query("LOAD httpfs;")
+            self.duckdb_manager.execute_query(f"SET s3_region='{aws_region}'")
+            self.duckdb_manager.execute_query(
+                f"SET s3_access_key_id='{aws_access_key}';"
+            )
+            self.duckdb_manager.execute_query(
+                f"SET s3_secret_access_key='{aws_secret_access_key}';"
+            )
+            self.duckdb_manager.execute_query("CALL load_aws_credentials();")
+            logger.success("AWS credentials loaded!")
+        except Exception as e:
+            logger.error(f"Error loading AWS credentials: {e}")
 
 
 class DataManager:
@@ -32,7 +168,7 @@ class DataManager:
 
     def __init__(
         self,
-        duckdb_manager,
+        duckdb_manager: DuckDBManager,
         local_database: str,
         remote_database: str,
         bronze_schema: str,
@@ -164,10 +300,10 @@ class Ingestor:
 
     def __init__(
         self,
-        duckdb_manager,
-        motherduck_manager,
-        aws_manager,
-        data_manager,
+        duckdb_manager: DuckDBManager,
+        motherduck_manager: MotherDuckManager,
+        aws_manager: AWSManager,
+        data_manager: DataManager,
     ):
         """
         Initializes Ingestor.
@@ -197,9 +333,9 @@ class Ingestor:
 
 if __name__ == "__main__":
     # Create instances of classed
-    duckdb_manager = duckdb_manager.DuckDBManager()
-    motherduck_manager = motherduck_manager.MotherDuckManager(duckdb_manager, MOTHERDUCK_TOKEN)
-    aws_manager = aws_manager.AWSManager(
+    duckdb_manager = DuckDBManager()
+    motherduck_manager = MotherDuckManager(duckdb_manager, MOTHERDUCK_TOKEN)
+    aws_manager = AWSManager(
         duckdb_manager, AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY
     )
     data_manager = DataManager(
