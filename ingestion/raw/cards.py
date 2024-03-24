@@ -157,7 +157,7 @@ class DataSaver:
         """
         try:
             logger.info("Saving data locally")
-            path = os.path.join(self.table_path, f"{self.table_name}.json")
+            path = f"{self.table_path}{self.table_name}.json"
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w") as file:
                 json.dump([item.dict() for item in data], file, indent=4)
@@ -165,7 +165,7 @@ class DataSaver:
         except Exception as e:
             logger.error(f"An error occurred while saving data locally: {e}")
 
-    def save_s3(self, data: List[Dict[str, Any]]) -> None:
+    def save_s3(self, data: List) -> None:
         """
         Saves parsed data to AWS S3 bucket.
 
