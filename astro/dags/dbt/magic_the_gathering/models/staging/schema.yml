@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: stg_cards
+    description: "Individual Magic: The Gathering cards that players could obtain and add to their collection (with a few minor exceptions)." 
+    columns:
+      - name: id
+        description: >
+          A unique ID for the card in Scryfall database.
+      - name: name
+        description: >
+          The name of the card. If the card has multiple faces, this field will contain both names separated by ␣//␣.
+      - name: released_at
+        description: >
+          The date the card was first released.
+      - name: color_identity
+        description: >
+          The card color identity.
+      - name: set_name
+        description: >
+          The card full set name.
+      - name: artist
+        description: >
+          The name of the illustrator of the card face. Newly spoiled cards may not have this field yet.
+      - name: (prices).usd
+        description: >
+          The card usd price.

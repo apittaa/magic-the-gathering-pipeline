@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: s3-magic-the-gathering
+    meta:
+      external_location: "{{ env_var('TRANSFORM_S3_PATH_INPUT') }}"
+    tables:
+      - name: cards
