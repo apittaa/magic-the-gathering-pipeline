@@ -19,7 +19,6 @@ The goal of this project is to build an end-to-end batch data pipeline on Magic:
 - [Architecture](#architecture)
 - [ELT Steps](#elt-steps)
 - [The Dashboard](#the-dashboard)
-- [Reproduction](#reproduction)
 - [Conclusion](#conclusion)
 
 ## Problem statement
